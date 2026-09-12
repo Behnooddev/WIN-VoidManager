@@ -62,6 +62,7 @@ model Employee {
   socialLinks     EmployeeSocial[]
   documents       Document[]
   credentials     Credential[]
+  customValues    CustomFieldValue[]
 
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
@@ -170,4 +171,37 @@ model UserRole {
   role   Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
   @@id([userId, roleId])
+}
+
+model CustomField {
+  id          String            @id @default(uuid())
+  name        String
+  type        FieldType
+  isRequired  Boolean           @default(false)
+  values      CustomFieldValue[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+}
+
+enum FieldType {
+  TEXT
+  NUMBER
+  BOOLEAN
+  DATE
+  SELECT
+  MULTI_SELECT
+  URL
+}
+
+model CustomFieldValue {
+  id         String   @id @default(uuid())
+  fieldId    String
+  employeeId String
+  value      String   // Stored as string, casted by application logic
+  field      CustomField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  employee   Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  @@unique([fieldId, employeeId])
 }

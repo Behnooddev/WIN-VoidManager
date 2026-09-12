@@ -3,12 +3,14 @@ import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { Request } from 'express';
+import { CustomFieldService } from '../custom-fields/custom-fields.service';
 
 @Injectable()
 export class EmployeeService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
+    private readonly customFieldService: CustomFieldService,
   ) {}
 
   async createEmployee(data: Prisma.EmployeeCreateInput, actorId: string, request?: Request) {
@@ -65,6 +67,9 @@ export class EmployeeService {
       include: {
         department: true,
         socialLinks: true,
+        customValues: {
+          include: { field: true }
+        },
         manager: { select: { firstName: true, lastName: true } },
         user: { select: { email: true } }
       },
