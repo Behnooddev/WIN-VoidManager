@@ -1,9 +1,10 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ForbiddenException } from '@nestjs/common';
 import { UserService } from '../users/users.service';
 import Redis from 'ioredis';
 import { v4 as uuidv4 } from 'uuid';
 import { AuditService } from '../audit/audit.service';
 import { Request } from 'express';
+import { MfaService } from './mfa.service';
 
 @Injectable()
 export class AuthService {
@@ -16,6 +17,7 @@ export class AuthService {
   constructor(
     private readonly userService: UserService,
     private readonly auditService: AuditService,
+    private readonly mfaService: MfaService,
   ) {}
 
   async login(email: string, pass: string, request?: Request) {
@@ -39,6 +41,21 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    // MFA CHECK
+    if (user.isMfaEnabled) {
+      const partialSessionId = uuidv4();
+      await this.redis.set(
+        `partial_session:${partialSessionId}`,
+        JSON.stringify({ userId: user.id, email: user.email }),
+        'EX', 300, // 5 minutes to provide MFA code
+      );
+
+      return {
+        mfaRequired: true,
+        mfaSessionId: partialSessionId
+      };
+    }
+
     const sessionId = uuidv4();
     const sessionData = {
       userId: user.id,
@@ -52,8 +69,45 @@ export class AuthService {
       'EX', 86400,
     );
 
-    // Maintain a set of active sessions for the user
     await this.redis.sadd(`user_sessions:${user.id}`, sessionId);
+
+    await this.auditService.logEvent({
+      eventType: 'auth.login.success',
+      actorId: user.id,
+      result: 'SUCCESS',
+    }, request);
+
+    return { sessionId };
+  }
+
+  async verifyMfaAndLogin(mfaSessionId: string, token: string, request?: Request) {
+    const data = await this.redis.get(`partial_session:${mfaSessionId}`);
+    if (!data) {
+      throw new UnauthorizedException('MFA session expired');
+    }
+    const { userId, email } = JSON.parse(data);
+    const user = await this.userService.findById(userId);
+
+    const isValid = this.mfaService.verifyToken(token, user.mfaSecret || '');
+    if (!isValid) {
+      await this.auditService.logEvent({
+        eventType: 'auth.mfa.failure',
+        actorId: userId,
+        result: 'FAILURE',
+      }, request);
+      throw new UnauthorizedException('Invalid MFA token');
+    }
+
+    const sessionId = uuidv4();
+    const sessionData = {
+      userId: user.id,
+      email: user.email,
+      createdAt: new Date().toISOString(),
+    };
+
+    await this.redis.set(`session:${sessionId}`, JSON.stringify(sessionData), 'EX', 86400);
+    await this.redis.sadd(`user_sessions:${user.id}`, sessionId);
+    await this.redis.del(`partial_session:${mfaSessionId}`);
 
     await this.auditService.logEvent({
       eventType: 'auth.login.success',
@@ -102,7 +156,6 @@ export class AuthService {
           ...JSON.parse(data),
         });
       } else {
-        // Cleanup expired session from the set
         await this.redis.srem(`user_sessions:${userId}`, sid);
       }
     }
