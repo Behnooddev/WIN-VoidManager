@@ -60,6 +60,7 @@ model Employee {
   internalNotes   String?
 
   socialLinks     EmployeeSocial[]
+  documents       Document[]
 
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
@@ -79,6 +80,29 @@ model Department {
   id        String     @id @default(uuid())
   name      String     @unique
   employees Employee[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model Document {
+  id              String            @id @default(uuid())
+  employeeId      String
+  employee        Employee          @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  categoryId      String
+  category        DocumentCategory  @relation(fields: [categoryId], references: [id])
+  originalName    String
+  storageKey      String            @unique // Randomized identifier
+  mimeType        String
+  size            Int
+  uploaderId      String
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+}
+
+model DocumentCategory {
+  id        String     @id @default(uuid())
+  name      String     @unique
+  documents Document[]
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
 }

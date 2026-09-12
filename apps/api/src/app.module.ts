@@ -8,9 +8,11 @@ import { UserModule } from './users/users.module';
 import { RoleModule } from './roles/roles.module';
 import { EmployeeModule } from './employees/employees.module';
 import { DepartmentModule } from './departments/departments.module';
+import { StorageModule } from './storage/storage.module';
+import { DocumentModule } from './documents/documents.module';
 
 @Module({
-  imports: [PrismaModule, HealthModule, AuthModule, UserModule, RoleModule, EmployeeModule, DepartmentModule],
+  imports: [PrismaModule, HealthModule, AuthModule, UserModule, RoleModule, EmployeeModule, DepartmentModule, StorageModule, DocumentModule],
   controllers: [AppController],
   providers: [AppService],
 })
