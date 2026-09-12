@@ -39,13 +39,40 @@ model Employee {
   lastName        String
   preferredName   String?
   profilePicture  String?
+
+  // Contact
+  email           String?
+  phone           String?
+  secondaryPhone  String?
+  address         String?
+  emergencyContact String?
+
+  // Employment
   departmentId    String?
   department      Department?    @relation(fields: [departmentId], references: [id])
   position        String?
+  managerId       String?
+  manager         Employee?      @relation("EmployeeManager", fields: [managerId], references: [id])
+  subordinates    Employee[]    @relation("EmployeeManager")
   status          EmployeeStatus @default(ACTIVE)
   startDate       DateTime?
+  endDate         DateTime?
+  internalNotes   String?
+
+  socialLinks     EmployeeSocial[]
+
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
+}
+
+model EmployeeSocial {
+  id         String    @id @default(uuid())
+  employeeId String
+  platform   String    // e.g., "LinkedIn", "GitHub"
+  url        String
+  employee   Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, platform])
 }
 
 model Department {
