@@ -26,6 +26,7 @@ model User {
   status        UserStatus @default(ACTIVE)
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
+  deletedAt     DateTime?  // Soft delete
   employee      Employee?
   roles         UserRole[]
 }
@@ -66,6 +67,7 @@ model Employee {
 
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
+  deletedAt       DateTime?      // Soft delete
 
   @@index([firstName])
   @@index([lastName])
@@ -88,6 +90,7 @@ model Department {
   employees Employee[]
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
+  deletedAt DateTime?  // Soft delete
 }
 
 model Document {
@@ -103,6 +106,7 @@ model Document {
   uploaderId      String
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
+  deletedAt       DateTime?         // Soft delete
 }
 
 model DocumentCategory {
@@ -126,6 +130,7 @@ model Credential {
   tag             String   // Tag for Value encryption
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?  // Soft delete
 
   @@unique([employeeId, label])
 }

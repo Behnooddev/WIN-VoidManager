@@ -15,6 +15,7 @@ import { CustomFieldModule } from './custom-fields/custom-fields.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { EmployeePortalModule } from './portal/employee-portal.module';
 import { SecurityCenterModule } from './security-center/security-center.module';
+import { LifecycleModule } from './lifecycle/lifecycle.module';
 import { ThrottlerModule } from '@nestjs/throttler';
 
 @Module({
@@ -33,6 +34,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
     DashboardModule,
     EmployeePortalModule,
     SecurityCenterModule,
+    LifecycleModule,
     ThrottlerModule.forRoot([{
       ttl: 60000,
       limit: 10,
