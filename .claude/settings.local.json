@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx @nestjs/cli new api --package-manager npm --skip-git)",
+      "Bash(npm install *)",
+      "Bash(npx prisma *)",
+      "Bash(npm uninstall *)",
+      "Bash(docker-compose up *)"
+    ]
+  }
+}
