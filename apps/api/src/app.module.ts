@@ -10,9 +10,10 @@ import { EmployeeModule } from './employees/employees.module';
 import { DepartmentModule } from './departments/departments.module';
 import { StorageModule } from './storage/storage.module';
 import { DocumentModule } from './documents/documents.module';
+import { VaultModule } from './vault/vault.module';
 
 @Module({
-  imports: [PrismaModule, HealthModule, AuthModule, UserModule, RoleModule, EmployeeModule, DepartmentModule, StorageModule, DocumentModule],
+  imports: [PrismaModule, HealthModule, AuthModule, UserModule, RoleModule, EmployeeModule, DepartmentModule, StorageModule, DocumentModule, VaultModule],
   controllers: [AppController],
   providers: [AppService],
 })
