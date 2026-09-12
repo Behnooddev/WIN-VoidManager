@@ -15,9 +15,29 @@ import { CustomFieldModule } from './custom-fields/custom-fields.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { EmployeePortalModule } from './portal/employee-portal.module';
 import { SecurityCenterModule } from './security-center/security-center.module';
+import { ThrottlerModule } from '@nestjs/throttler';
 
 @Module({
-  imports: [PrismaModule, HealthModule, AuthModule, UserModule, RoleModule, EmployeeModule, DepartmentModule, StorageModule, DocumentModule, VaultModule, CustomFieldModule, DashboardModule, EmployeePortalModule, SecurityCenterModule],
+  imports: [
+    PrismaModule,
+    HealthModule,
+    AuthModule,
+    UserModule,
+    RoleModule,
+    EmployeeModule,
+    DepartmentModule,
+    StorageModule,
+    DocumentModule,
+    VaultModule,
+    CustomFieldModule,
+    DashboardModule,
+    EmployeePortalModule,
+    SecurityCenterModule,
+    ThrottlerModule.forRoot([{
+      ttl: 60000,
+      limit: 10,
+    }]),
+  ],
   controllers: [AppController],
   providers: [AppService],
 })
