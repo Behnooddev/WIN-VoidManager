@@ -13,9 +13,11 @@ import { DocumentModule } from './documents/documents.module';
 import { VaultModule } from './vault/vault.module';
 import { CustomFieldModule } from './custom-fields/custom-fields.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { EmployeePortalModule } from './portal/employee-portal.module';
+import { SecurityCenterModule } from './security-center/security-center.module';
 
 @Module({
-  imports: [PrismaModule, HealthModule, AuthModule, UserModule, RoleModule, EmployeeModule, DepartmentModule, StorageModule, DocumentModule, VaultModule, CustomFieldModule, DashboardModule],
+  imports: [PrismaModule, HealthModule, AuthModule, UserModule, RoleModule, EmployeeModule, DepartmentModule, StorageModule, DocumentModule, VaultModule, CustomFieldModule, DashboardModule, EmployeePortalModule, SecurityCenterModule],
   controllers: [AppController],
   providers: [AppService],
 })

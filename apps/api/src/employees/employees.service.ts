@@ -91,6 +91,53 @@ export class EmployeeService {
     return employee;
   }
 
+  async findEmployeeForSelf(userId: string) {
+    const employee = await this.prisma.employee.findUnique({
+      where: { userId },
+      include: {
+        department: true,
+        socialLinks: true,
+        customValues: {
+          include: { field: true }
+        },
+        manager: { select: { firstName: true, lastName: true } },
+      },
+    });
+    if (!employee) throw new NotFoundException('Employee profile not found');
+
+    // Data Minimization: Filter out internal notes and admin-only fields
+    const { internalNotes, ...publicProfile } = employee;
+    return publicProfile;
+  }
+
+  async updateEmployeeSelf(id: string, data: any, actorId: string, request?: Request) {
+    // Strict filter for fields an employee can change themselves
+    const permittedFields: Record<string, any> = {};
+    const allowedKeys = ['preferredName', 'profilePicture', 'phone', 'secondaryPhone', 'address', 'emergencyContact'];
+
+    for (const key of allowedKeys) {
+      if (data[key] !== undefined) {
+        permittedFields[key] = data[key];
+      }
+    }
+
+    const employee = await this.prisma.employee.update({
+      where: { id },
+      data: permittedFields,
+      include: { socialLinks: true },
+    });
+
+    await this.auditService.logEvent({
+      eventType: 'employee.self_update',
+      actorId,
+      targetId: id,
+      result: 'SUCCESS',
+      metadata: { updatedFields: Object.keys(permittedFields) },
+    }, request);
+
+    return employee;
+  }
+
   async listEmployees(params: { skip?: number; take?: number; search?: string }) {
     const { skip = 0, take = 20, search } = params;
 

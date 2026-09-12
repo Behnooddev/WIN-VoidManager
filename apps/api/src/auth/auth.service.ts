@@ -43,6 +43,7 @@ export class AuthService {
     const sessionData = {
       userId: user.id,
       email: user.email,
+      createdAt: new Date().toISOString(),
     };
 
     await this.redis.set(
@@ -50,6 +51,9 @@ export class AuthService {
       JSON.stringify(sessionData),
       'EX', 86400,
     );
+
+    // Maintain a set of active sessions for the user
+    await this.redis.sadd(`user_sessions:${user.id}`, sessionId);
 
     await this.auditService.logEvent({
       eventType: 'auth.login.success',
@@ -73,6 +77,9 @@ export class AuthService {
     const userId = session?.userId;
 
     await this.redis.del(`session:${sessionId}`);
+    if (userId) {
+      await this.redis.srem(`user_sessions:${userId}`, sessionId);
+    }
 
     if (userId) {
       await this.auditService.logEvent({
@@ -81,5 +88,40 @@ export class AuthService {
         result: 'SUCCESS',
       }, request);
     }
+  }
+
+  async getUserSessions(userId: string) {
+    const sessionIds = await this.redis.smembers(`user_sessions:${userId}`);
+    const sessions = [];
+
+    for (const sid of sessionIds) {
+      const data = await this.redis.get(`session:${sid}`);
+      if (data) {
+        sessions.push({
+          sessionId: sid,
+          ...JSON.parse(data),
+        });
+      } else {
+        // Cleanup expired session from the set
+        await this.redis.srem(`user_sessions:${userId}`, sid);
+      }
+    }
+
+    return sessions;
+  }
+
+  async revokeSession(sessionId: string, request?: Request) {
+    const session = await this.validateSession(sessionId);
+    if (!session) return;
+
+    await this.redis.del(`session:${sessionId}`);
+    await this.redis.srem(`user_sessions:${session.userId}`, sessionId);
+
+    await this.auditService.logEvent({
+      eventType: 'auth.session_revoke',
+      actorId: session.userId,
+      targetId: sessionId,
+      result: 'SUCCESS',
+    }, request);
   }
 }
