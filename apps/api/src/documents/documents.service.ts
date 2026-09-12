@@ -3,12 +3,15 @@ import { PrismaService } from '../prisma/prisma.service';
 import { StorageProvider } from '../storage/storage.provider';
 import { Inject } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { AuditService } from '../audit/audit.service';
+import { Request } from 'express';
 
 @Injectable()
 export class DocumentService {
   constructor(
     private readonly prisma: PrismaService,
     @Inject('STORAGE_PROVIDER') private readonly storage: StorageProvider,
+    private readonly auditService: AuditService,
   ) {}
 
   async uploadDocument(
@@ -16,12 +19,11 @@ export class DocumentService {
     categoryId: string,
     uploaderId: string,
     file: Express.Multer.File,
+    request?: Request,
   ) {
-    // 1. Upload to storage
     const storageKey = await this.storage.upload(file.buffer, file.originalname, file.mimetype);
 
-    // 2. Save metadata to DB
-    return this.prisma.document.create({
+    const doc = await this.prisma.document.create({
       data: {
         employeeId,
         categoryId,
@@ -32,6 +34,16 @@ export class DocumentService {
         uploaderId,
       },
     });
+
+    await this.auditService.logEvent({
+      eventType: 'document.upload',
+      actorId: uploaderId,
+      targetId: doc.id,
+      result: 'SUCCESS',
+      metadata: { filename: file.originalname },
+    }, request);
+
+    return doc;
   }
 
   async getDocument(id: string, userId: string) {
@@ -42,7 +54,6 @@ export class DocumentService {
 
     if (!doc) throw new NotFoundException('Document not found');
 
-    // Ownership check: User must be the employee or an admin (admin check handled in controller)
     if (doc.employee.userId !== userId) {
       throw new ForbiddenException('You do not have permission to access this document');
     }
@@ -50,8 +61,16 @@ export class DocumentService {
     return doc;
   }
 
-  async getDocumentStream(id: string, userId: string) {
+  async getDocumentStream(id: string, userId: string, request?: Request) {
     const doc = await this.getDocument(id, userId);
+
+    await this.auditService.logEvent({
+      eventType: 'document.download',
+      actorId: userId,
+      targetId: id,
+      result: 'SUCCESS',
+    }, request);
+
     return this.storage.download(doc.storageKey);
   }
 
@@ -62,22 +81,40 @@ export class DocumentService {
     });
   }
 
-  async deleteDocument(id: string, userId: string) {
+  async deleteDocument(id: string, userId: string, request?: Request) {
     const doc = await this.getDocument(id, userId);
 
     await this.storage.delete(doc.storageKey);
-    return this.prisma.document.delete({
+    const result = await this.prisma.document.delete({
       where: { id },
     });
+
+    await this.auditService.logEvent({
+      eventType: 'document.delete',
+      actorId: userId,
+      targetId: id,
+      result: 'SUCCESS',
+    }, request);
+
+    return result;
   }
 
   async getCategories() {
     return this.prisma.documentCategory.findMany();
   }
 
-  async createCategory(name: string) {
-    return this.prisma.documentCategory.create({
+  async createCategory(name: string, actorId: string, request?: Request) {
+    const category = await this.prisma.documentCategory.create({
       data: { name },
     });
+
+    await this.auditService.logEvent({
+      eventType: 'document.category.create',
+      actorId,
+      targetId: category.id,
+      result: 'SUCCESS',
+    }, request);
+
+    return category;
   }
 }

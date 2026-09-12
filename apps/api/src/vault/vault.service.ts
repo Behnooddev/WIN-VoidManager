@@ -1,18 +1,21 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { EncryptionService } from '../security/encryption.service';
+import { AuditService } from '../audit/audit.service';
+import { Request } from 'express';
 
 @Injectable()
 export class CredentialVaultService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly encryption: EncryptionService,
+    private readonly auditService: AuditService,
   ) {}
 
-  async storeCredential(employeeId: string, label: string, secret: string) {
+  async storeCredential(employeeId: string, label: string, secret: string, actorId: string, request?: Request) {
     const encrypted = await this.encryption.encryptValue(secret);
 
-    return this.prisma.credential.upsert({
+    const cred = await this.prisma.credential.upsert({
       where: {
         employeeId_label: { employeeId, label },
       },
@@ -35,16 +38,26 @@ export class CredentialVaultService {
         dekTag: encrypted.dekTag,
       },
     });
+
+    await this.auditService.logEvent({
+      eventType: 'credential.store',
+      actorId,
+      targetId: cred.id,
+      result: 'SUCCESS',
+      metadata: { label },
+    }, request);
+
+    return cred;
   }
 
-  async revealCredential(id: string) {
+  async revealCredential(id: string, actorId: string, request?: Request) {
     const cred = await this.prisma.credential.findUnique({
       where: { id },
     });
 
     if (!cred) throw new NotFoundException('Credential not found');
 
-    return this.encryption.decryptValue(
+    const secret = this.encryption.decryptValue(
       cred.encryptedValue,
       cred.iv,
       cred.tag,
@@ -52,6 +65,15 @@ export class CredentialVaultService {
       cred.dekIv,
       cred.dekTag,
     );
+
+    await this.auditService.logEvent({
+      eventType: 'credential.reveal',
+      actorId,
+      targetId: id,
+      result: 'SUCCESS',
+    }, request);
+
+    return secret;
   }
 
   async listCredentials(employeeId: string) {
@@ -65,9 +87,23 @@ export class CredentialVaultService {
     });
   }
 
-  async deleteCredential(id: string) {
-    return this.prisma.credential.delete({
+  async deleteCredential(id: string, actorId: string, request?: Request) {
+    const cred = await this.prisma.credential.findUnique({
       where: { id },
     });
+    if (!cred) throw new NotFoundException('Credential not found');
+
+    const result = await this.prisma.credential.delete({
+      where: { id },
+    });
+
+    await this.auditService.logEvent({
+      eventType: 'credential.delete',
+      actorId,
+      targetId: id,
+      result: 'SUCCESS',
+    }, request);
+
+    return result;
   }
 }

@@ -18,8 +18,6 @@ export class EmployeeController {
   @UseGuards(PermissionGuard)
   @RequirePermission('employee.read')
   async list(@Body() body: any) {
-    // Using @Body for search/pagination in GET is weird but for simplicity in this step.
-    // Normally use @Query.
     return this.employeeService.listEmployees(body);
   }
 
@@ -27,13 +25,11 @@ export class EmployeeController {
   async getOne(@Param('id') id: string, @Req() req: Request) {
     const user = req['user'];
 
-    // Check if user is the employee themselves
     const myEmployee = await this.employeeService.findEmployeeByUserId(user.userId);
     if (myEmployee && myEmployee.id === id) {
       return this.employeeService.findEmployeeById(id);
     }
 
-    // Otherwise, check for admin permission
     const hasPerm = await this.roleService.hasPermission(user.userId, 'employee.read');
     if (!hasPerm) {
       throw new ForbiddenException('You do not have permission to view this profile');
@@ -45,8 +41,8 @@ export class EmployeeController {
   @Post()
   @UseGuards(PermissionGuard)
   @RequirePermission('employee.create')
-  async create(@Body() body: any) {
-    return this.employeeService.createEmployee(body);
+  async create(@Body() body: any, @Req() req: Request) {
+    return this.employeeService.createEmployee(body, req['user'].userId, req);
   }
 
   @Put(':id')
@@ -62,22 +58,20 @@ export class EmployeeController {
       throw new ForbiddenException('You do not have permission to update this profile');
     }
 
-    // Note: if isOwner, we should filter out 'internalNotes' and 'status'
-    // to prevent employees from promoting themselves.
     if (isOwner) {
       delete body.internalNotes;
       delete body.status;
-      delete body.position; // Company manages position
+      delete body.position;
     }
 
-    return this.employeeService.updateEmployee(id, body);
+    return this.employeeService.updateEmployee(id, body, user.userId, req);
   }
 
   @Delete(':id')
   @UseGuards(PermissionGuard)
   @RequirePermission('employee.delete')
-  async remove(@Param('id') id: string) {
-    return this.employeeService.deleteEmployee(id);
+  async remove(@Param('id') id: string, @Req() req: Request) {
+    return this.employeeService.deleteEmployee(id, req['user'].userId, req);
   }
 
   @Post(':id/social')
@@ -92,7 +86,7 @@ export class EmployeeController {
       throw new ForbiddenException('Permission denied');
     }
 
-    return this.employeeService.addSocialLink(id, body.platform, body.url);
+    return this.employeeService.addSocialLink(id, body.platform, body.url, user.userId, req);
   }
 
   @Delete(':id/social/:platform')
@@ -107,6 +101,6 @@ export class EmployeeController {
       throw new ForbiddenException('Permission denied');
     }
 
-    return this.employeeService.removeSocialLink(id, platform);
+    return this.employeeService.removeSocialLink(id, platform, user.userId, req);
   }
 }

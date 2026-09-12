@@ -1,30 +1,62 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
+import { AuditService } from '../audit/audit.service';
+import { Request } from 'express';
 
 @Injectable()
 export class EmployeeService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditService: AuditService,
+  ) {}
 
-  async createEmployee(data: Prisma.EmployeeCreateInput) {
-    return this.prisma.employee.create({
+  async createEmployee(data: Prisma.EmployeeCreateInput, actorId: string, request?: Request) {
+    const employee = await this.prisma.employee.create({
       data,
       include: { socialLinks: true },
     });
+
+    await this.auditService.logEvent({
+      eventType: 'employee.create',
+      actorId,
+      targetId: employee.id,
+      result: 'SUCCESS',
+    }, request);
+
+    return employee;
   }
 
-  async updateEmployee(id: string, data: Prisma.EmployeeUpdateInput) {
-    return this.prisma.employee.update({
+  async updateEmployee(id: string, data: Prisma.EmployeeUpdateInput, actorId: string, request?: Request) {
+    const employee = await this.prisma.employee.update({
       where: { id },
       data,
       include: { socialLinks: true },
     });
+
+    await this.auditService.logEvent({
+      eventType: 'employee.update',
+      actorId,
+      targetId: id,
+      result: 'SUCCESS',
+    }, request);
+
+    return employee;
   }
 
-  async deleteEmployee(id: string) {
-    return this.prisma.employee.delete({
+  async deleteEmployee(id: string, actorId: string, request?: Request) {
+    const employee = await this.prisma.employee.delete({
       where: { id },
     });
+
+    await this.auditService.logEvent({
+      eventType: 'employee.delete',
+      actorId,
+      targetId: id,
+      result: 'SUCCESS',
+    }, request);
+
+    return employee;
   }
 
   async findEmployeeById(id: string) {
@@ -82,21 +114,41 @@ export class EmployeeService {
     };
   }
 
-  async addSocialLink(employeeId: string, platform: string, url: string) {
-    return this.prisma.employeeSocial.upsert({
+  async addSocialLink(employeeId: string, platform: string, url: string, actorId: string, request?: Request) {
+    const result = await this.prisma.employeeSocial.upsert({
       where: {
         employeeId_platform: { employeeId, platform },
       },
       update: { url },
       create: { employeeId, platform, url },
     });
+
+    await this.auditService.logEvent({
+      eventType: 'employee.social.update',
+      actorId,
+      targetId: employeeId,
+      result: 'SUCCESS',
+      metadata: { platform },
+    }, request);
+
+    return result;
   }
 
-  async removeSocialLink(employeeId: string, platform: string) {
-    return this.prisma.employeeSocial.delete({
+  async removeSocialLink(employeeId: string, platform: string, actorId: string, request?: Request) {
+    const result = await this.prisma.employeeSocial.delete({
       where: {
         employeeId_platform: { employeeId, platform },
       },
     });
+
+    await this.auditService.logEvent({
+      eventType: 'employee.social.delete',
+      actorId,
+      targetId: employeeId,
+      result: 'SUCCESS',
+      metadata: { platform },
+    }, request);
+
+    return result;
   }
 }

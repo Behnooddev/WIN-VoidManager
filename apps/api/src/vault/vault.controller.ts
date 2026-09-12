@@ -17,25 +17,21 @@ export class VaultController {
   @Post('store')
   @UseGuards(PermissionGuard)
   @RequirePermission('employee.credentials.create')
-  async store(@Body() body: { employeeId: string; label: string; secret: string }) {
-    return this.vaultService.storeCredential(body.employeeId, body.label, body.secret);
+  async store(@Body() body: { employeeId: string; label: string; secret: string }, @Req() req: Request) {
+    return this.vaultService.storeCredential(body.employeeId, body.label, body.secret, req['user'].userId, req);
   }
 
   @Get('reveal/:id')
   async reveal(@Param('id') id: string, @Req() req: Request) {
     const user = req['user'];
 
-    // 1. Check for specific permission to reveal secrets
     const hasPerm = await this.roleService.hasPermission(user.userId, 'employee.credentials.read');
     if (!hasPerm) {
       throw new ForbiddenException('You do not have permission to reveal secrets');
     }
 
-    // 2. Audit the reveal event (will be fully implemented in the Audit stage)
-    console.log(`Audit: User ${user.userId} revealed secret ${id}`);
-
     return {
-      secret: await this.vaultService.revealCredential(id),
+      secret: await this.vaultService.revealCredential(id, user.userId, req),
     };
   }
 
@@ -49,7 +45,7 @@ export class VaultController {
   @Delete(':id')
   @UseGuards(PermissionGuard)
   @RequirePermission('employee.credentials.delete')
-  async remove(@Param('id') id: string) {
-    return this.vaultService.deleteCredential(id);
+  async remove(@Param('id') id: string, @Req() req: Request) {
+    return this.vaultService.deleteCredential(id, req['user'].userId, req);
   }
 }

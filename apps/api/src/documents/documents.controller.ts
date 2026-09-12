@@ -25,14 +25,8 @@ export class DocumentController {
   ) {
     const user = req['user'];
 
-    // Check if user is the employee or has upload permission
-    const myEmployee = await this.roleService.hasPermission(user.userId, 'employee.documents.upload');
-    const isOwner = (await this.roleService.getUserPermissions(user.userId)).includes('employee.documents.upload'); // simplified
-
-    // Better ownership check
-    // In a real scenario, we'd check if user.userId corresponds to the employeeId
-    // For now, rely on permission
-    if (!myEmployee && !isOwner) {
+    const hasPerm = await this.roleService.hasPermission(user.userId, 'employee.documents.upload');
+    if (!hasPerm) {
       throw new ForbiddenException('Permission denied');
     }
 
@@ -41,6 +35,7 @@ export class DocumentController {
       categoryId,
       user.userId,
       file,
+      req,
     );
   }
 
@@ -51,11 +46,7 @@ export class DocumentController {
     try {
       const doc = await this.documentService.getDocument(id, user.userId);
 
-      // If it failed the ownership check inside getDocument, it would throw.
-      // But we also check for admin permission.
-      const hasAdminPerm = await this.roleService.hasPermission(user.userId, 'employee.documents.read');
-
-      const stream = await this.documentService.getDocumentStream(id, user.userId);
+      const stream = await this.documentService.getDocumentStream(id, user.userId, req);
 
       res.setHeader('Content-Type', doc.mimeType);
       res.setHeader('Content-Disposition', `attachment; filename="${doc.originalName}"`);
@@ -65,9 +56,8 @@ export class DocumentController {
       if (e instanceof ForbiddenException) {
         const hasAdminPerm = await this.roleService.hasPermission(user.userId, 'employee.documents.read');
         if (hasAdminPerm) {
-          // Admin can download anyway
           const doc = await this.documentService.getDocument(id, 'admin-override'); // simplified
-          const stream = await this.documentService.getDocumentStream(id, 'admin-override');
+          const stream = await this.documentService.getDocumentStream(id, 'admin-override', req);
           res.setHeader('Content-Type', doc.mimeType);
           res.setHeader('Content-Disposition', `attachment; filename="${doc.originalName}"`);
           stream.pipe(res);
@@ -88,8 +78,8 @@ export class DocumentController {
   @Post('categories')
   @UseGuards(PermissionGuard)
   @RequirePermission('employee.documents.manage')
-  async createCategory(@Body() body: { name: string }) {
-    return this.documentService.createCategory(body.name);
+  async createCategory(@Body() body: { name: string }, @Req() req: Request) {
+    return this.documentService.createCategory(body.name, req['user'].userId, req);
   }
 
   @Get('categories')
@@ -100,6 +90,6 @@ export class DocumentController {
   @Delete(':id')
   async delete(@Param('id') id: string, @Req() req: Request) {
     const user = req['user'];
-    return this.documentService.deleteDocument(id, user.userId);
+    return this.documentService.deleteDocument(id, user.userId, req);
   }
 }

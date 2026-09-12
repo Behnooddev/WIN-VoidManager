@@ -8,9 +8,9 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('login')
-  async login(@Body() body: any, @Res() res: Response) {
+  async login(@Body() body: any, @Res() res: Response, @Req() req: Request) {
     const { email, password } = body;
-    const { sessionId } = await this.authService.login(email, password);
+    const { sessionId } = await this.authService.login(email, password, req);
 
     res.cookie('void_session', sessionId, {
       httpOnly: true,
@@ -26,7 +26,7 @@ export class AuthController {
   async logout(@Req() req: Request, @Res() res: Response) {
     const sessionId = req.cookies?.['void_session'];
     if (sessionId) {
-      await this.authService.logout(sessionId);
+      await this.authService.logout(sessionId, req);
     }
 
     res.clearCookie('void_session');

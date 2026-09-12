@@ -2,6 +2,8 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { UserService } from '../users/users.service';
 import Redis from 'ioredis';
 import { v4 as uuidv4 } from 'uuid';
+import { AuditService } from '../audit/audit.service';
+import { Request } from 'express';
 
 @Injectable()
 export class AuthService {
@@ -11,16 +13,29 @@ export class AuthService {
     password: process.env.REDIS_PASSWORD,
   });
 
-  constructor(private readonly userService: UserService) {}
+  constructor(
+    private readonly userService: UserService,
+    private readonly auditService: AuditService,
+  ) {}
 
-  async login(email: string, pass: string) {
+  async login(email: string, pass: string, request?: Request) {
     const user = await this.userService.findByEmail(email);
     if (!user) {
+      await this.auditService.logEvent({
+        eventType: 'auth.login.failure',
+        result: 'FAILURE',
+        metadata: { email },
+      }, request);
       throw new UnauthorizedException('Invalid credentials');
     }
 
     const isValid = await this.userService.verifyPassword(user.passwordHash, pass);
     if (!isValid) {
+      await this.auditService.logEvent({
+        eventType: 'auth.login.failure',
+        actorId: user.id,
+        result: 'FAILURE',
+      }, request);
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -30,12 +45,17 @@ export class AuthService {
       email: user.email,
     };
 
-    // Store session in Redis for 24 hours
     await this.redis.set(
       `session:${sessionId}`,
       JSON.stringify(sessionData),
       'EX', 86400,
     );
+
+    await this.auditService.logEvent({
+      eventType: 'auth.login.success',
+      actorId: user.id,
+      result: 'SUCCESS',
+    }, request);
 
     return { sessionId };
   }
@@ -48,7 +68,18 @@ export class AuthService {
     return JSON.parse(data);
   }
 
-  async logout(sessionId: string) {
+  async logout(sessionId: string, request?: Request) {
+    const session = await this.validateSession(sessionId);
+    const userId = session?.userId;
+
     await this.redis.del(`session:${sessionId}`);
+
+    if (userId) {
+      await this.auditService.logEvent({
+        eventType: 'auth.logout',
+        actorId: userId,
+        result: 'SUCCESS',
+      }, request);
+    }
   }
 }

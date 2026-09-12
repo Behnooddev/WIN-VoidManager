@@ -125,6 +125,18 @@ model Credential {
   @@unique([employeeId, label])
 }
 
+model AuditLog {
+  id        String   @id @default(uuid())
+  eventType String   // e.g., "auth.login", "employee.create"
+  actorId   String?  // User ID of the person who performed the action
+  targetId  String?  // ID of the affected resource
+  result    String   // "SUCCESS" or "FAILURE"
+  ipAddress String?
+  userAgent String?
+  metadata  Json?    // Additional context
+  timestamp DateTime @default(now())
+}
+
 model Role {
   id          String           @id @default(uuid())
   name        String           @unique
